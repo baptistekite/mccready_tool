@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from PIL import Image
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="MacCready Polar Tool", layout="wide")
@@ -89,50 +90,85 @@ col1.metric(label="Optimal Airspeed", value=f"{opt_v:.1f} km/h")
 col2.metric(label="Ground Speed", value=f"{ground_speed:.1f} km/h")
 col3.metric(label="Effective Vertical Shift", value=f"{origin_y:.1f} m/s")
 
-# --- 5. MATPLOTLIB PLOTTING ---
-plt.style.use('dark_background')
-BG_COLOR, ACCENT_BLUE, ACCENT_PINK, ACCENT_GREEN, TEXT_COLOR = '#1e1e2e', '#00E5FF', '#FF007F', '#00FF66', '#cdd6f4'
-
-fig, ax = plt.subplots(figsize=(10, 6))
-fig.patch.set_facecolor(BG_COLOR)
-ax.set_facecolor(BG_COLOR)
-
-# Generate curves
+# --- 5. PLOTLY CHARTING ---
 v_range = np.linspace(v_min, v_max, 300)
 s_range = get_sink_rate(glider_name, v_range)
 
-# Plot elements
-ax.plot(v_range, s_range, color=ACCENT_BLUE, linewidth=2.5, label='Glider Polar')
-ax.plot(data['vx'], data['vy'], 'x', color='#6c7086', markersize=6, alpha=0.7, label='Raw Data')
-ax.plot([origin_x, opt_v], [origin_y, opt_s], '--', color=ACCENT_PINK, linewidth=1.5, label='Tangent')
-ax.plot([origin_x], [origin_y], 'o', color=ACCENT_GREEN, markersize=8, zorder=5, label='Virtual Origin')
-ax.plot([opt_v], [opt_s], 'o', color=ACCENT_PINK, markersize=8, zorder=5, label='Optimal Speed')
+fig = go.Figure()
 
-# Optional Logos (will render if they exist in the GitHub repo)
+# Glider Polar Curve
+fig.add_trace(go.Scatter(
+    x=v_range, y=s_range, mode='lines', name='Glider Polar',
+    line=dict(color='#00E5FF', width=3), hoverinfo='x+y'
+))
+
+# Raw Data Points
+fig.add_trace(go.Scatter(
+    x=data['vx'], y=data['vy'], mode='markers', name='Raw Data',
+    marker=dict(color='#6c7086', symbol='x', size=8), hoverinfo='skip'
+))
+
+# Tangent Line
+fig.add_trace(go.Scatter(
+    x=[origin_x, opt_v], y=[origin_y, opt_s], mode='lines', name='Speed to Fly Tangent',
+    line=dict(color='#FF007F', width=2, dash='dash'), hoverinfo='skip'
+))
+
+# Virtual Origin Point
+fig.add_trace(go.Scatter(
+    x=[origin_x], y=[origin_y], mode='markers', name='Virtual Origin',
+    marker=dict(color='#00FF66', size=12, line=dict(color='white', width=1)),
+    hovertemplate="Origin<br>Wind: %{x} km/h<br>Shift: %{y} m/s<extra></extra>"
+))
+
+# Optimal Speed Point
+fig.add_trace(go.Scatter(
+    x=[opt_v], y=[opt_s], mode='markers', name='Optimal Speed',
+    marker=dict(color='#FF007F', size=12, line=dict(color='white', width=1)),
+    hovertemplate="Optimal Speed<br>Airspeed: %{x:.1f} km/h<br>Sink: %{y:.2f} m/s<extra></extra>"
+))
+
+# Configure Layout and Theme
+fig.update_layout(
+    plot_bgcolor='#1e1e2e',
+    paper_bgcolor='#1e1e2e',
+    font=dict(color='#cdd6f4'),
+    xaxis=dict(
+        title="Horizontal air speed (km/h)",
+        range=[-5, 70],
+        gridcolor='#313244',
+        zeroline=True, zerolinecolor='#585b70', zerolinewidth=2
+    ),
+    yaxis=dict(
+        title="Vertical speed (m/s)",
+        range=[-3, 4],
+        gridcolor='#313244',
+        zeroline=True, zerolinecolor='#585b70', zerolinewidth=2
+    ),
+    legend=dict(
+        yanchor="top", y=0.99, xanchor="right", x=0.99,
+        bgcolor="rgba(30, 30, 46, 0.8)", bordercolor="#45475a", borderwidth=1
+    ),
+    height=600,
+    margin=dict(l=40, r=40, t=40, b=40)
+)
+
+# Render Logos
 try:
-    ax_logo1 = fig.add_axes([0.02, 0.85, 0.12, 0.12], zorder=10)
-    ax_logo1.imshow(plt.imread('Oz_logo.png'))
-    ax_logo1.axis('off')
+    logo1 = Image.open('Oz_logo.png')
+    fig.add_layout_image(
+        dict(source=logo1, xref="paper", yref="paper", x=0.01, y=0.99,
+             sizex=0.15, sizey=0.15, xanchor="left", yanchor="top", opacity=0.9)
+    )
 except: pass
 
 try:
-    ax_logo2 = fig.add_axes([0.86, 0.02, 0.12, 0.12], zorder=10)
-    ax_logo2.imshow(plt.imread('Ozone_logo.png'))
-    ax_logo2.axis('off')
+    logo2 = Image.open('Ozone_logo.png')
+    fig.add_layout_image(
+        dict(source=logo2, xref="paper", yref="paper", x=0.99, y=0.01,
+             sizex=0.15, sizey=0.15, xanchor="right", yanchor="bottom", opacity=0.9)
+    )
 except: pass
 
-# Aesthetics
-ax.set_xlabel("Horizontal air speed (km/h)", color=TEXT_COLOR)
-ax.set_ylabel("Vertical speed (m/s)", color=TEXT_COLOR)
-ax.grid(True, which='both', color='#45475a', linestyle=':', linewidth=1)
-ax.axhline(0, color='#585b70', linewidth=1.5)
-ax.axvline(0, color='#585b70', linewidth=1.5)
-for spine in ['top', 'right']: ax.spines[spine].set_visible(False)
-for spine in ['bottom', 'left']: ax.spines[spine].set_color('#585b70')
-ax.tick_params(colors=TEXT_COLOR)
-ax.legend(loc='upper right', facecolor=BG_COLOR, edgecolor='none', labelcolor=TEXT_COLOR)
-ax.set_xlim(-5, 70)
-ax.set_ylim(-3, 4)
-
-# Render plot in Streamlit
-st.pyplot(fig)
+# Display Chart in Streamlit
+st.plotly_chart(fig, use_container_width=True)
